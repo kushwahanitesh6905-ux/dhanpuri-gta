@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dhanpuri GTA - Real Edition</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #game-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+
+    /* HUD OVERLAYS */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .hud-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      color: #fff;
+      padding: 10px 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      pointer-events: auto;
+    }
+
+    #top-left-panel {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 200px;
+    }
+    .game-title {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #f59e0b;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hud-row {
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      color: #cbd5e1;
+    }
+    .hud-value {
+      font-weight: 700;
+      color: #fff;
+    }
+
+    #top-right-panel {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .coin-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 20px;
+      font-weight: 900;
+      color: #ffd700;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #ffd700;
+      padding: 6px 14px;
+      border-radius: 30px;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+    }
+
+    #mission-box {
+      position: absolute;
+      top: 90px;
+      right: 15px;
+      max-width: 280px;
+      border-left: 4px solid #10b981;
+    }
+    .mission-header {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #10b981;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+    }
+    .mission-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 2px 0 4px 0;
+      color: #f8fafc;
+    }
+    .mission-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.3;
+    }
+    .mission-reward {
+      margin-top: 5px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #ffd700;
+    }
+
+    /* SPEEDOMETER */
+    #speedo-box {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      font-weight: 900;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 6px 16px;
+      color: #fff;
+    }
+    #speed-val {
+      font-size: 26px;
+      color: #38bdf8;
+    }
+    #speed-unit {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    /* MISSION COMPLETE MODAL */
+    #mission-modal {
+      position: absolute;
+      top: 35%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.8);
+      background: rgba(0, 0, 0, 0.9);
+      border: 2px solid #ffd700;
+      border-radius: 16px;
+      padding: 20px 30px;
+      text-align: center;
+      color: #fff;
+      box-shadow: 0 0 35px rgba(255, 215, 0, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 50;
+    }
+    #mission-modal.active {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    #mission-modal h2 {
+      font-size: 22px;
+      color: #ffd700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    #mission-modal p {
+      font-size: 14px;
+      color: #e2e8f0;
+      margin: 8px 0;
+    }
+    #mission-modal .reward-
+  
