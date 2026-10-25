@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dhanpuri Flying Cars 3D</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+  #canvas-container { width: 100%; height: 100%; position: absolute; left: 0; top: 0; }
+  
+  /* Start Overlay */
+  #start-screen {
+    position: absolute; inset: 0; background: radial-gradient(circle, #1a2a44, #050b14);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100; color: #fff; text-align: center; padding: 20px;
+  }
+  #start-screen h1 { font-size: 28px; color: #00ffcc; text-shadow: 0 0 15px #00ffcc; margin-bottom: 8px; }
+  #start-screen p { font-size: 14px; color: #ccc; margin-bottom: 20px; max-width: 400px; }
+  #btn-start {
+    background: linear-gradient(45deg, #ff0055, #ff5500); border: none; color: #fff;
+    font-size: 20px; font-weight: bold; padding: 14px 40px; border-radius: 30px;
+    cursor: pointer; box-shadow: 0 0 20px rgba(255,85,0,0.6);
+  }
+
+  /* HUD */
+  #hud { position: absolute; top: 12px; left: 12px; color: #fff; font-size: 13px; z-index: 10; pointer-events: none; }
+  .badge { background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 8px; margin-bottom: 6px; border-left: 4px solid #00ffcc; }
+  
+  /* Mobile Controls */
+  #mobile-controls {
+    position: absolute; bottom: 15px; left: 0; width: 100%; display: flex;
+    justify-content: space-between; padding: 0 20px; z-index: 15; pointer-events: none;
+  }
+  .ctrl-cluster { display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
+  .ctrl-row { display: flex; gap: 8px; justify-content: center; }
+  .btn-touch {
+    width: 55px; height: 55px; background: rgba(255,255,255,0.25); border: 2px solid rgba(255,255,255,0.6);
+    border-radius: 12px; color: #fff; font-weight: bold; font-size: 16px; display: flex;
+    align-items: center; justify-content: center; backdrop-filter: blur(5px);
+  }
+  .btn-touch:active { background: #00ffcc; color: #000; }
+  .btn-action { width: 65px; height: 65px; border-radius: 50%; font-size: 13px; }
+  .btn-fly { background: rgba(0,255,200,0.35); border-color: #00ffcc; }
+  .btn-enter { background: rgba(255,200,0,0.35); border-color: #ffcc00; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>DHANPURI GTA</h1>
+  <p>5 Flying Cars: Hasan, Nitesh, Kartik, Yaseen & Sheru.<br>Sadak par chalao ya aasmaan me udao!</p>
+  <button id="btn-start" onclick="startGame()">START GAME</button>
+</div>
+
+<div id="hud">
+  <div class="badge" id="hud-status">Status: Paidal (Walking)</div>
+  <div class="badge" id="hud-car">Car: Koi nahi</div>
+  <div class="badge" id="hud-place">Qareebi Jagah: SECL Gate</div>
+</div>
+
+<div id="mobile-controls">
+  <!-- D-Pad Left -->
+  <div class="ctrl-cluster">
+    <div class="ctrl-row">
+      <div class="btn-touch" id="btn-up">▲</div>
+    </div>
+    <div class="ctrl-row">
+      <div class="btn-touch" id="btn-left">◀</div>
+      <div class="btn-touch" id="btn-down">▼</div>
+      <div class="btn-touch" id="btn-right">▶</div>
+    </div>
+  </div>
+
+  <!-- Actions Right -->
+  <div class="ctrl-cluster">
+    <div class="ctrl-row">
+      <div class="btn-touch btn-action btn-enter" id="btn-f">GADI<br>[F]</div>
+      <div class="btn-touch btn-action btn-fly" id="btn-fly">UDAAN<br>[G]</div>
+    </div>
+    <div class="ctrl-row">
+      <div class="btn-touch" id="btn-alt-up">UP<br>[E]</div>
+      <div class="btn-touch" id="btn-alt-down">DN<br>[Q]</div>
+    </div>
+  </div>
+</div>
+
+<div id="canvas-container"></div>
+
+<script>
+let scene, camera, renderer;
+let player, currentCar = null, isDriving = false, isFlying = false;
+let cars = [], labels = [];
+let keys = { w:0, s:0, a:0, d:0, q:0, e:0 };
+
+const carData = [
+  { name: "Hasan (Sky Phantom)", color: 0x00ffff, pos: [-15, 0, 20] },
+  { name: "Nitesh (Falcon Thunder)", color: 0xff4400, pos: [15, 0, 20] },
+  { name: "Kartik (Neon Blade)", color: 0x00ff44, pos: [-25, 0, -30] },
+  { name: "Yaseen (Coal Cruiser)", color: 0xffcc00, pos: [25, 0, -30] },
+  { name: "Sheru (Dhanpuri Flyer)", color: 0xcc00ff, pos: [0, 0, -50] }
+];
+
+const landmarks = [
+  { name: "SECL Coal Mines", pos: [0, 0, -180] },
+  { name: "Maa Jwalamukhi Mandir", pos: [-120, 0, -80] },
+  { name: "Noori Masjid Dhanpuri", pos: [120, 0, -80] },
+  { name: "Dhanpuri Bazaar", pos: [0, 0, 80] },
+  { name: "SECL Colony", pos: [-80, 0, 100] }
+];
+
+function initGame() {
+  const container = document.getElementById('canvas-container');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.FogExp2(0x87ceeb, 0.0035);
+
+  camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1500);
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  // Lights
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffeebb, 1.0);
+  dir.position.set(100, 150, 50);
+  scene.add(dir);
+
+  // Ground & Roads
+  const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+  const groundMat = new THREE.MeshLambertMaterial({ color: 0x223322 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  createRoads();
+  createLandmarks();
+  spawnPlayer();
+  spawnCars();
+  setupTouch();
+
+  window.addEventListener('resize', onWindowResize);
+  document.addEventListener('keydown', (e) => handleKey(e.code, 1));
+  document.addEventListener('keyup', (e) => handleKey(e.code, 0));
+
+  animate();
+}
+
+function createRoads() {
+  const roadMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+  const r1 = new THREE.Mesh(new THREE.PlaneGeometry(24, 800), roadMat);
+  r1.rotation.x = -Math.PI / 2;
+  r1.position.y = 0.05;
+  scene.add(r1);
+
+  const r2 = new THREE.Mesh(new THREE.PlaneGeometry(600, 24), roadMat);
+  r2.rotation.x = -Math.PI / 2;
+  r2.position.y = 0.06;
+  scene.add(r2);
+}
+
+function makeTextSprite(message, color = "#ffff00") {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.roundRect ? ctx.roundRect(10, 10, 492, 108, 16) : ctx.rect(10, 10, 492, 108);
+  ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.stroke();
+  ctx.fillStyle = "#ffffff"; ctx.font = "bold 34px sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(message, 256, 64);
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture }));
+  sprite.scale.set(30, 7.5, 1);
+  return sprite;
+}
+
+function createLandmarks() {
+  landmarks.forEach(lm => {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(20, 16, 20), new THREE.MeshLambertMaterial({ color: 0x887766 }));
+    box.position.set(lm.pos[0], 8, lm.pos[2]);
+    scene.add(box);
+
+    const lbl = makeTextSprite(lm.name, "#00ffcc");
+    lbl.position.set(lm.pos[0], 28, lm.pos[2]);
+    scene.add(lbl);
+  });
+}
+
+function spawnPlayer() {
+  player = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.8), new THREE.MeshLambertMaterial({ color: 0x0088ff }));
+  body.position.y = 0.9;
+  player.add(body);
+  player.position.set(0, 0, 10);
+  scene.add(player);
+}
+
+function spawnCars() {
+  carData.forEach(c => {
+    const group = new THREE.Group();
+    // Body
+    const carBody = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 6), new THREE.MeshLambertMaterial({ color: c.color }));
+    carBody.position.y = 0.8;
+    group.add(carBody);
+
+    // Cabin
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 3), new THREE.MeshLambertMaterial({ color: 0x111111 }));
+    cabin.position.set(0, 1.5, -0.3);
+    group.add(cabin);
+
+    // Wings
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(9, 0.1, 1.5), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    wing.position.set(0, 1.0, 0);
+    wing.name = "wing";
+    group.add(wing);
+
+    // Name Label
+    const tag = makeTextSprite(c.name, "#ffcc00");
+    tag.position.y = 4.5;
+    tag.scale.set(16, 4, 1);
+    group.add(tag);
+
+    group.position.set(c.pos[0], 0, c.pos[2]);
+    group.userData = { name: c.name, speed: 0, rotSpeed: 0, altSpeed: 0 };
+    cars.push(group);
+    scene.add(group);
+  });
+}
+
+function handleKey(code, val) {
+  if (code === 'KeyW' || code === 'ArrowUp') keys.w = val;
+  if (code === 'KeyS' || code === 'ArrowDown') keys.s = val;
+  if (code === 'KeyA' || code === 'ArrowLeft') keys.a = val;
+  if (code === 'KeyD' || code === 'ArrowRight') keys.d = val;
+  if (code === 'KeyQ') keys.q = val;
+  if (code === 'KeyE') keys.e = val;
+  if (val && code === 'KeyF') toggleEnterCar();
+  if (val && code === 'KeyG') toggleFlight();
+}
+
+function setupTouch() {
+  const bind = (id, key) => {
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = 1; });
+    el.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = 0; });
+  };
+  bind('btn-up', 'w');
+  bind('btn-down', 's');
+  bind('btn-left', 'a');
+  bind('btn-right', 'd');
+  bind('btn-alt-up', 'e');
+  bind('btn-alt-down', 'q');
+
+  document.getElementById('btn-f').addEventListener('touchstart', (e) => { e.preventDefault(); toggleEnterCar(); });
+  document.getElementById('btn-fly').addEventListener('touchstart', (e) => { e.preventDefault(); toggleFlight(); });
+}
+
+function toggleEnterCar() {
+  if (isDriving) {
+    // Utarna
+    isDriving = false;
+    isFlying = false;
+    player.position.set(currentCar.position.x + 3, 0, currentCar.position.z);
+    player.visible = true;
+    currentCar = null;
+    document.getElementById('hud-status').innerText = "Status: Paidal (Walking)";
+    document.getElementById('hud-car').innerText = "Car: Koi nahi";
+  } else {
+    // Nearest car dhundho
+    let nearest = null, minDist = 8;
+    cars.forEach(c => {
+      const d = player.position.distanceTo(c.position);
+      if (d < minDist) { minDist = d; nearest = c; }
+    });
+    if (nearest) {
+      currentCar = nearest;
+      isDriving = true;
+      player.visible = false;
+      document.getElementById('hud-status').innerText = "Status: Driving (Sadak Mode)";
+      document.getElementById('hud-car').innerText = "Car: " + currentCar.userData.name;
+    }
+  }
+}
+
+function toggleFlight() {
+  if (!isDriving) return;
+  isFlying = !isFlying;
+  document.getElementById('hud-status').innerText = isFlying ? "Status: Flying (Aasmaan Mode)" : "Status: Driving (Sadak Mode)";
+}
+
+function updateHUD() {
+  const currentPos = isDriving ? currentCar.position : player.position;
+  let nearName = "", nearDist = 9999;
+  landmarks.forEach(l => {
+    const d = currentPos.distanceTo(new THREE.Vector3(l.pos[0], 0, l.pos[2]));
+    if (d < nearDist) { nearDist = d; nearName = l.name; }
+  });
+  document.getElementById('hud-place').innerText = "Qareebi Jagah: " + nearName + " (" + Math.round(nearDist) + "m)";
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (isDriving && currentCar) {
+    // Car Controls
+    if (keys.w) currentCar.userData.speed = THREE.MathUtils.lerp(currentCar.userData.speed, isFlying ? 1.4 : 0.9, 0.05);
+    else if (keys.s) currentCar.userData.speed = THREE.MathUtils.lerp(currentCar.userData.speed, -0.4, 0.05);
+    else currentCar.userData.speed = THREE.MathUtils.lerp(currentCar.userData.speed, 0, 0.05);
+
+    if (keys.a) currentCar.rotation.y += 0.035;
+    if (keys.d) currentCar.rotation.y -= 0.035;
+
+    currentCar.translateZ(-currentCar.userData.speed);
+
+    if (isFlying) {
+      if (keys.e) currentCar.position.y += 0.5;
+      if (keys.q && currentCar.position.y > 0.5) currentCar.position.y -= 0.5;
+    } else {
+      if (currentCar.position.y > 0) currentCar.position.y = Math.max(0, currentCar.position.y - 0.4);
+    }
+
+    // Camera follow car
+    const camOffset = new THREE.Vector3(0, 5, 14).applyAxisAngle(new THREE.Vector3(0, 1, 0), currentCar.rotation.y);
+    camera.position.lerp(currentCar.position.clone().add(camOffset), 0.1);
+    camera.lookAt(currentCar.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+
+  } else if (player) {
+    // Walking Controls
+    const speed = 0.35;
+    if (keys.w) player.translateZ(-speed);
+    if (keys.s) player.translateZ(speed);
+    if (keys.a) player.rotation.y += 0.04;
+    if (keys.d) player.rotation.y -= 0.04;
+
+    const camOffset = new THREE.Vector3(0, 4, 8).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y);
+    camera.position.lerp(player.position.clone().add(camOffset), 0.1);
+    camera.lookAt(player.position.clone().add(new THREE.Vector3(0, 1, 0)));
+  }
+
+  updateHUD();
+  renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+  if (!camera || !renderer) return;
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  initGame();
+}
+</script>
+</body>
+</html>
